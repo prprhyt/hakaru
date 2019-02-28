@@ -1,22 +1,29 @@
 package main
 
 import (
+	"fmt"
 	"github.com/valyala/fasthttp"
-
-	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gocraft/dbr"
 	"os"
 )
 
-func okHandler(ctx *fasthttp.RequestCtx) {
-    ctx.SetStatusCode(fasthttp.StatusOK)
-}
-
 type Event struct {
 	Name string `db:"name"`
 	Value string `db:"value"`
+}
+
+func okHandler(ctx *fasthttp.RequestCtx) {
+	ctx.SetStatusCode(fasthttp.StatusOK)
+}
+
+func bulkInsert(event <- chan Event){
+	events := []Event{}
+	for {
+		i := <- event
+		events = append(events, i)
+	}
 }
 
 func main() {
@@ -24,7 +31,6 @@ func main() {
 	if dataSourceName == "" {
 		dataSourceName = "root:hakaru-pass@tcp(127.0.0.1:13306)/hakaru-db"
 	}
-	events := []Event{}
 
 	hakaruHandler := func(ctx *fasthttp.RequestCtx) {
 		db, err := dbr.Open("mysql", dataSourceName, nil)
@@ -46,14 +52,15 @@ func main() {
 		events = append(events, Event{name, value});
 
 		sess := db.NewSession(nil)
-		query := sess.InsertInto("events").Columns("name", "value")
+		query := sess.InsertInto("eventlog").Columns("name", "value")
 
 		for _, value := range events {
 			query.Record(value)
 		}
 
-		if len(events) >= 100 {
+		if len(events) >= 10 {
 			_, err := query.Exec()
+			events = events[:0]
 			if err != nil {
 				panic(err.Error())
 			}
