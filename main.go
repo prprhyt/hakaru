@@ -6,11 +6,17 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gocraft/dbr"
 	"os"
 )
 
 func okHandler(ctx *fasthttp.RequestCtx) {
-    ctx.SetStatusCode(fasthttp.StatusOK) 
+    ctx.SetStatusCode(fasthttp.StatusOK)
+}
+
+type Event struct {
+	Name string `db:"name"`
+	Value string `db:"value"`
 }
 
 func main() {
@@ -18,9 +24,10 @@ func main() {
 	if dataSourceName == "" {
 		dataSourceName = "root:hakaru-pass@tcp(127.0.0.1:13306)/hakaru-db"
 	}
+	events := []Event{}
 
 	hakaruHandler := func(ctx *fasthttp.RequestCtx) {
-		db, err := sql.Open("mysql", dataSourceName)
+		db, err := dbr.Open("mysql", dataSourceName, nil)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -36,7 +43,21 @@ func main() {
 		name := string(ctx.QueryArgs().Peek("name"))
 		value := string(ctx.QueryArgs().Peek("value"))
 
-		_, _ = stmt.Exec(name, value)
+		events = append(events, Event{name, value});
+
+		sess := db.NewSession(nil)
+		query := sess.InsertInto("events").Columns("name", "value")
+
+		for _, value := range events {
+			query.Record(value)
+		}
+
+		if len(events) >= 100 {
+			_, err := query.Exec()
+			if err != nil {
+				panic(err.Error())
+			}
+		}
 
 		origin := string(ctx.Request.Header.Peek("Origin"))
 		if origin != "" {
