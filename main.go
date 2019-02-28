@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/valyala/fasthttp"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gocraft/dbr"
@@ -10,6 +10,7 @@ import (
 )
 
 type Event struct {
+	At time.Time `db:"at"`
 	Name string `db:"name"`
 	Value string `db:"value"`
 }
@@ -19,52 +20,43 @@ func okHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func bulkInsert(event <- chan Event){
-	events := []Event{}
-	for {
-		i := <- event
-		events = append(events, i)
-	}
-}
-
-func main() {
 	dataSourceName := os.Getenv("HAKARU_DATASOURCENAME")
 	if dataSourceName == "" {
 		dataSourceName = "root:hakaru-pass@tcp(127.0.0.1:13306)/hakaru-db"
 	}
-
-	hakaruHandler := func(ctx *fasthttp.RequestCtx) {
-		db, err := dbr.Open("mysql", dataSourceName, nil)
-		if err != nil {
-			panic(err.Error())
-		}
-		defer db.Close()
-
-		stmt, e := db.Prepare("INSERT INTO eventlog(at, name, value) values(NOW(), ?, ?)")
-		if e != nil {
-			panic(e.Error())
-		}
-
-		defer stmt.Close()
-
-		name := string(ctx.QueryArgs().Peek("name"))
-		value := string(ctx.QueryArgs().Peek("value"))
-
-		events = append(events, Event{name, value});
-
-		sess := db.NewSession(nil)
-		query := sess.InsertInto("eventlog").Columns("name", "value")
-
-		for _, value := range events {
-			query.Record(value)
-		}
-
+	db, err := dbr.Open("mysql", dataSourceName, nil)
+	if err != nil {
+		panic(err.Error())
+	}
+	events := []Event{}
+	for {
+		i := <- event
+		events = append(events, i)
 		if len(events) >= 10 {
+			sess := db.NewSession(nil)
+			query := sess.InsertInto("eventlog").Columns("at","name", "value")
+
+			for _, value := range events {
+				query.Record(value)
+			}
 			_, err := query.Exec()
 			events = events[:0]
 			if err != nil {
 				panic(err.Error())
 			}
 		}
+	}
+}
+
+func main() {
+
+	ch := make(chan Event)
+	go bulkInsert(ch)
+	hakaruHandler := func(ctx *fasthttp.RequestCtx) {
+
+		name := string(ctx.QueryArgs().Peek("name"))
+		value := string(ctx.QueryArgs().Peek("value"))
+		ch <- Event{time.Now(),name,value}
 
 		origin := string(ctx.Request.Header.Peek("Origin"))
 		if origin != "" {

@@ -10,6 +10,17 @@
   version = "v1.4.0"
 
 [[projects]]
+  digest = "1:2f99776ce3e90e6aa852cb6a92c551f5017142d897e34f832a0a1c08c6602949"
+  name = "github.com/gocraft/dbr"
+  packages = [
+    ".",
+    "dialect",
+  ]
+  pruneopts = "UT"
+  revision = "042fe86dc2daa9684f746ab337971e84147e8856"
+  version = "v2.4"
+
+[[projects]]
   digest = "1:aaa8e0e7e35d92e21daed3f241832cee73d15ca1cd3302ba3843159a959a7eac"
   name = "github.com/klauspost/compress"
   packages = [
@@ -62,6 +73,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/go-sql-driver/mysql",
+    "github.com/gocraft/dbr",
     "github.com/valyala/fasthttp",
   ]
   solver-name = "gps-cdcl"
