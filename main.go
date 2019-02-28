@@ -32,7 +32,7 @@ func bulkInsert(event <- chan Event){
 	for {
 		i := <- event
 		events = append(events, i)
-		if len(events) >= 10 {
+		if len(events) >= 100 {
 			sess := db.NewSession(nil)
 			query := sess.InsertInto("eventlog").Columns("at","name", "value")
 
